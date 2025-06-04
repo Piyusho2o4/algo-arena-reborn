@@ -4,9 +4,11 @@ import { Search, User, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 const Navbar = () => {
   const location = useLocation();
+  const { user, loading } = useAuth();
   
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -55,12 +57,23 @@ const Navbar = () => {
             />
           </div>
           
-          <Link to="/profile">
-            <Button variant="ghost" size="sm">
-              <User className="w-4 h-4 mr-2" />
-              Profile
-            </Button>
-          </Link>
+          {!loading && (
+            user ? (
+              <Link to="/profile">
+                <Button variant="ghost" size="sm">
+                  <User className="w-4 h-4 mr-2" />
+                  Profile
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/auth">
+                <Button variant="ghost" size="sm">
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Sign In
+                </Button>
+              </Link>
+            )
+          )}
           
           <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
             Premium

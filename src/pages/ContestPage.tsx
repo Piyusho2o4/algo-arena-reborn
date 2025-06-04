@@ -1,48 +1,113 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { Calendar, Clock, Users, Trophy, Star } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
-const contests = [
-  {
-    id: 1,
-    title: "Weekly Contest 385",
-    type: "Weekly",
-    startTime: "2024-01-28 10:30",
-    duration: "1.5 hours",
-    participants: 15234,
-    status: "upcoming",
-    problems: 4,
-    difficulty: "Easy to Hard"
-  },
-  {
-    id: 2,
-    title: "Biweekly Contest 122",
-    type: "Biweekly",
-    startTime: "2024-01-30 22:30",
-    duration: "1.5 hours",
-    participants: 12890,
-    status: "upcoming",
-    problems: 4,
-    difficulty: "Easy to Hard"
-  },
-  {
-    id: 3,
-    title: "Weekly Contest 384",
-    type: "Weekly",
-    startTime: "2024-01-21 10:30",
-    duration: "1.5 hours",
-    participants: 18567,
-    status: "finished",
-    problems: 4,
-    difficulty: "Easy to Hard"
-  }
-];
+interface Contest {
+  id: string;
+  title: string;
+  type: string;
+  start_time: string;
+  duration_minutes: number;
+  participants: number;
+  status: string;
+  problems: number[];
+}
 
 const ContestPage = () => {
+  const [contests, setContests] = useState<Contest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userStats, setUserStats] = useState({
+    globalRanking: 0,
+    contestRating: 1500,
+    contestsAttended: 0
+  });
+  const { user } = useAuth();
+
+  useEffect(() => {
+    fetchContests();
+    if (user) {
+      fetchUserStats();
+    }
+  }, [user]);
+
+  const fetchContests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contests')
+        .select('*')
+        .order('start_time', { ascending: true });
+
+      if (error) throw error;
+      setContests(data || []);
+    } catch (error) {
+      console.error('Error fetching contests:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserStats = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('global_ranking, contest_rating, contests_attended')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      
+      if (data) {
+        setUserStats({
+          globalRanking: data.global_ranking || 0,
+          contestRating: data.contest_rating || 1500,
+          contestsAttended: data.contests_attended || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+    }
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-7xl mx-auto p-6">
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <Card key={i} className="p-6 animate-pulse">
+                <div className="h-6 bg-gray-200 rounded mb-4"></div>
+                <div className="grid grid-cols-4 gap-4">
+                  {[...Array(4)].map((_, j) => (
+                    <div key={j} className="h-4 bg-gray-200 rounded"></div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -70,11 +135,11 @@ const ContestPage = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="flex items-center text-gray-600">
                     <Calendar className="w-4 h-4 mr-2" />
-                    {contest.startTime}
+                    {formatDateTime(contest.start_time)}
                   </div>
                   <div className="flex items-center text-gray-600">
                     <Clock className="w-4 h-4 mr-2" />
-                    {contest.duration}
+                    {formatDuration(contest.duration_minutes)}
                   </div>
                   <div className="flex items-center text-gray-600">
                     <Users className="w-4 h-4 mr-2" />
@@ -82,7 +147,7 @@ const ContestPage = () => {
                   </div>
                   <div className="flex items-center text-gray-600">
                     <Trophy className="w-4 h-4 mr-2" />
-                    {contest.problems} problems
+                    4 problems
                   </div>
                 </div>
               </Card>
@@ -104,11 +169,11 @@ const ContestPage = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="flex items-center text-gray-600">
                     <Calendar className="w-4 h-4 mr-2" />
-                    {contest.startTime}
+                    {formatDateTime(contest.start_time)}
                   </div>
                   <div className="flex items-center text-gray-600">
                     <Clock className="w-4 h-4 mr-2" />
-                    {contest.duration}
+                    {formatDuration(contest.duration_minutes)}
                   </div>
                   <div className="flex items-center text-gray-600">
                     <Users className="w-4 h-4 mr-2" />
@@ -116,7 +181,7 @@ const ContestPage = () => {
                   </div>
                   <div className="flex items-center text-gray-600">
                     <Trophy className="w-4 h-4 mr-2" />
-                    {contest.problems} problems
+                    4 problems
                   </div>
                 </div>
               </Card>
@@ -132,15 +197,17 @@ const ContestPage = () => {
                     <Star className="w-4 h-4 text-yellow-500" />
                     <span className="font-medium">Global Ranking</span>
                   </div>
-                  <span className="text-gray-600">#12,543</span>
+                  <span className="text-gray-600">
+                    #{userStats.globalRanking || 'Unranked'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Contest Rating</span>
-                  <span className="font-medium">1,847</span>
+                  <span className="font-medium">{userStats.contestRating}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Contests Attended</span>
-                  <span className="font-medium">23</span>
+                  <span className="font-medium">{userStats.contestsAttended}</span>
                 </div>
               </div>
             </Card>

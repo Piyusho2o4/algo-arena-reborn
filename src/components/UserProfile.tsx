@@ -1,169 +1,267 @@
 
-import React from 'react';
-import { Calendar, Award, TrendingUp, Code, Users } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Calendar, Award, Target, TrendingUp } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { Navigate } from 'react-router-dom';
+
+interface Profile {
+  id: string;
+  username: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  global_ranking: number;
+  contest_rating: number;
+  contests_attended: number;
+  problems_solved: number;
+  easy_solved: number;
+  medium_solved: number;
+  hard_solved: number;
+  created_at: string;
+}
 
 const UserProfile = () => {
-  const stats = {
-    totalSolved: 234,
-    easy: 89,
-    medium: 112,
-    hard: 33,
-    ranking: 12543,
-    acceptanceRate: 67.8,
-    streak: 15
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('');
+  const { user, signOut } = useAuth();
+
+  // Redirect if not logged in
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  useEffect(() => {
+    fetchProfile();
+  }, [user]);
+
+  const fetchProfile = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      
+      setProfile(data);
+      setUsername(data.username || '');
+      setFullName(data.full_name || '');
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const recentSubmissions = [
-    { problem: "Two Sum", status: "Accepted", time: "2 hours ago", runtime: "52ms" },
-    { problem: "Add Two Numbers", status: "Wrong Answer", time: "3 hours ago", runtime: "-" },
-    { problem: "Longest Substring", status: "Accepted", time: "1 day ago", runtime: "76ms" },
-    { problem: "Median of Arrays", status: "Time Limit Exceeded", time: "2 days ago", runtime: "-" }
-  ];
+  const updateProfile = async () => {
+    if (!user || !profile) return;
 
-  const badges = [
-    { name: "50 Days Badge", description: "Solved at least one problem for 50 consecutive days", earned: true },
-    { name: "Study Plan Finisher", description: "Completed LeetCode 75 study plan", earned: true },
-    { name: "Contest Badge", description: "Participated in 10 contests", earned: false },
-    { name: "Discussion Badge", description: "Got 100+ upvotes on discussions", earned: false }
-  ];
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          username,
+          full_name: fullName
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfile({
+        ...profile,
+        username,
+        full_name: fullName
+      });
+      
+      setEditing(false);
+      toast.success('Profile updated successfully!');
+    } catch (error: any) {
+      toast.error(error.message || 'Error updating profile');
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success('Signed out successfully!');
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Card className="p-6 animate-pulse">
+          <div className="h-8 bg-gray-200 rounded mb-4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-20 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-12">
+        <p className="text-gray-600">Profile not found</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Profile Header */}
       <Card className="p-6">
-        <div className="flex items-center space-x-6">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-            <span className="text-2xl font-bold text-white">JD</span>
-          </div>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold text-gray-900">john_doe_dev</h1>
-            <p className="text-gray-600">Software Engineer at Tech Corp</p>
-            <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-              <div className="flex items-center">
-                <Calendar className="w-4 h-4 mr-1" />
-                Joined January 2023
-              </div>
-              <div className="flex items-center">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                Ranking #{stats.ranking.toLocaleString()}
-              </div>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="w-16 h-16 bg-orange-500 rounded-full flex items-center justify-center">
+              <User className="w-8 h-8 text-white" />
             </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {editing ? (
+                  <Input
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="text-2xl font-bold"
+                    placeholder="Full Name"
+                  />
+                ) : (
+                  profile.full_name || 'Anonymous User'
+                )}
+              </h1>
+              <p className="text-gray-600">
+                @{editing ? (
+                  <Input
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="username"
+                    className="inline-block w-auto"
+                  />
+                ) : (
+                  profile.username || 'No username set'
+                )}
+              </p>
+              <p className="text-sm text-gray-500">{profile.email}</p>
+            </div>
+          </div>
+          <div className="space-x-2">
+            {editing ? (
+              <>
+                <Button onClick={updateProfile}>Save</Button>
+                <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+              </>
+            ) : (
+              <Button onClick={() => setEditing(true)}>Edit Profile</Button>
+            )}
+            <Button variant="outline" onClick={handleSignOut}>Sign Out</Button>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-6 text-sm text-gray-600">
+          <div className="flex items-center">
+            <Calendar className="w-4 h-4 mr-2" />
+            Joined {new Date(profile.created_at).toLocaleDateString()}
+          </div>
+          <div className="flex items-center">
+            <Award className="w-4 h-4 mr-2" />
+            Rank #{profile.global_ranking || 'Unranked'}
           </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Stats Overview */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Problem Solving Stats</h2>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900">{stats.totalSolved}</div>
-                <div className="text-sm text-gray-500">Total Solved</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{stats.easy}</div>
-                <div className="text-sm text-gray-500">Easy</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-600">{stats.medium}</div>
-                <div className="text-sm text-gray-500">Medium</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{stats.hard}</div>
-                <div className="text-sm text-gray-500">Hard</div>
-              </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Problems Solved</p>
+              <p className="text-2xl font-bold text-gray-900">{profile.problems_solved}</p>
             </div>
+            <Target className="w-8 h-8 text-blue-500" />
+          </div>
+        </Card>
 
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span>Easy</span>
-                <span>{stats.easy}/234</span>
-              </div>
-              <Progress value={(stats.easy / 234) * 100} className="h-2" />
-              
-              <div className="flex justify-between text-sm">
-                <span>Medium</span>
-                <span>{stats.medium}/567</span>
-              </div>
-              <Progress value={(stats.medium / 567) * 100} className="h-2" />
-              
-              <div className="flex justify-between text-sm">
-                <span>Hard</span>
-                <span>{stats.hard}/189</span>
-              </div>
-              <Progress value={(stats.hard / 189) * 100} className="h-2" />
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Contest Rating</p>
+              <p className="text-2xl font-bold text-gray-900">{profile.contest_rating}</p>
             </div>
-          </Card>
+            <TrendingUp className="w-8 h-8 text-green-500" />
+          </div>
+        </Card>
 
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Submissions</h2>
-            <div className="space-y-3">
-              {recentSubmissions.map((submission, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Code className="w-4 h-4 text-gray-500" />
-                    <span className="font-medium">{submission.problem}</span>
-                    <Badge 
-                      variant={submission.status === "Accepted" ? "default" : "destructive"}
-                      className={submission.status === "Accepted" ? "bg-green-100 text-green-800" : ""}
-                    >
-                      {submission.status}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <span>{submission.runtime}</span>
-                    <span>{submission.time}</span>
-                  </div>
-                </div>
-              ))}
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Contests Attended</p>
+              <p className="text-2xl font-bold text-gray-900">{profile.contests_attended}</p>
             </div>
-          </Card>
-        </div>
+            <Award className="w-8 h-8 text-yellow-500" />
+          </div>
+        </Card>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <Card className="p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Quick Stats</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Acceptance Rate</span>
-                <span className="font-medium">{stats.acceptanceRate}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Current Streak</span>
-                <span className="font-medium">{stats.streak} days</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Max Streak</span>
-                <span className="font-medium">28 days</span>
-              </div>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Global Ranking</p>
+              <p className="text-2xl font-bold text-gray-900">#{profile.global_ranking || 'N/A'}</p>
             </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Badges</h3>
-            <div className="space-y-3">
-              {badges.map((badge, index) => (
-                <div key={index} className={`flex items-center space-x-3 p-3 rounded-lg ${badge.earned ? 'bg-yellow-50' : 'bg-gray-50'}`}>
-                  <Award className={`w-5 h-5 ${badge.earned ? 'text-yellow-600' : 'text-gray-400'}`} />
-                  <div className="flex-1">
-                    <div className={`font-medium ${badge.earned ? 'text-yellow-900' : 'text-gray-500'}`}>
-                      {badge.name}
-                    </div>
-                    <div className="text-xs text-gray-500">{badge.description}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+            <TrendingUp className="w-8 h-8 text-purple-500" />
+          </div>
+        </Card>
       </div>
+
+      {/* Problem Solving Breakdown */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Problem Solving Progress</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-green-600">{profile.easy_solved}</div>
+            <div className="text-sm text-gray-600">Easy</div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div 
+                className="bg-green-500 h-2 rounded-full" 
+                style={{ width: `${Math.min((profile.easy_solved / 100) * 100, 100)}%` }}
+              ></div>
+            </div>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-3xl font-bold text-yellow-600">{profile.medium_solved}</div>
+            <div className="text-sm text-gray-600">Medium</div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div 
+                className="bg-yellow-500 h-2 rounded-full" 
+                style={{ width: `${Math.min((profile.medium_solved / 100) * 100, 100)}%` }}
+              ></div>
+            </div>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-3xl font-bold text-red-600">{profile.hard_solved}</div>
+            <div className="text-sm text-gray-600">Hard</div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div 
+                className="bg-red-500 h-2 rounded-full" 
+                style={{ width: `${Math.min((profile.hard_solved / 100) * 100, 100)}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 };
